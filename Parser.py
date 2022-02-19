@@ -45,7 +45,7 @@ class AvitoParser(DBManager):
         page = 1
         LotID = 1
 
-        for i in range(100):
+        while True:
             try:
                 num = 1
                 url = f'https://www.avito.ru/moskva/tovary_dlya_kompyutera/komplektuyuschie/videokarty-ASgBAgICAkTGB~pm7gmmZw?cd=1&p={page}'
