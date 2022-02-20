@@ -65,13 +65,10 @@ class AvitoParser(DBManager):
                     url_card = 'https://avito.ru'+AvitoParser.ParseTeg(str(soup2.find('a')), 'href')
                     answer = AvitoParser.ParseFromDB(DBManager.DataCheck(self, url_card))
                     if answer[0] != None:
-                        pass
+                        print(f"{colored(num, 'magenta')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'magenta')}")
                     else:
                         DBManager.InsertInDB(self, LotID, name, price, AvitoParser.ParsePrice(price), url_card)
-                        if answer[1] == 'New!':
-                            print(f"{colored(num, 'green')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'green', attrs=['underline'])}")
-                        else:
-                            print(f"{colored(num, 'magenta')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'magenta')}")
+                        print(f"{colored(num, 'green')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'green', attrs=['underline'])}")
                     num += 1
                     LotID += 1
 
