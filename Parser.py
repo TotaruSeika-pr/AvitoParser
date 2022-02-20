@@ -1,9 +1,11 @@
 from lib2to3.pgen2.parse import ParseError
+from tkinter import UNDERLINE
 from xml.etree.ElementTree import TreeBuilder
 import requests
 from bs4 import BeautifulSoup
 import time
 import sqlite3
+from termcolor import colored, cprint
 
 class DBManager:
 
@@ -50,10 +52,10 @@ class AvitoParser(DBManager):
                 num = 1
                 url = f'https://www.avito.ru/moskva/tovary_dlya_kompyutera/komplektuyuschie/videokarty-ASgBAgICAkTGB~pm7gmmZw?cd=1&p={page}'
                 print(f'\n=============== P A G E: {page} ===============\n')
+                time.sleep(3)
                 src = requests.get(url, headers=self.headers)
                 print(AvitoParser.CodeStatusCheck(code=src.status_code))
                 soup = BeautifulSoup(src.text, 'lxml')
-                time.sleep(1)
                 answer = soup.find_all('div', class_ = 'iva-item-content-rejJg')
                 for j in answer:
                     j = str(j)
@@ -66,7 +68,10 @@ class AvitoParser(DBManager):
                         pass
                     else:
                         DBManager.InsertInDB(self, LotID, name, price, AvitoParser.ParsePrice(price), url_card)
-                    print(f"{num} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {answer[1]}")
+                        if answer[1] == 'New!':
+                            print(f"{colored(num, 'green')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'green', attrs=['underline'])}")
+                        else:
+                            print(f"{colored(num, 'magenta')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'magenta')}")
                     num += 1
                     LotID += 1
 
@@ -78,17 +83,17 @@ class AvitoParser(DBManager):
 
     def CodeStatusCheck(code):
         if code == 200:
-                return 'Ready for parsing!'
+                return colored('Ready for parsing!', 'cyan')
         elif code == 302:
-            return 'No more pages (CTRL + C for stop)'
+            return colored('No more pages (CTRL + C for stop)', 'red')
         elif code == 404:
-                return 'Page not found (CTRL + C for stop)'
+                return colored('Page not found (CTRL + C for stop)', 'red')
         elif code == 429:
-                return 'Sending ban (CTRL + C for stop)'
+                return colored('Sending ban (CTRL + C for stop)', 'red')
         elif code == 500:
-            return 'The server cannot process the request (CTRL + C for stop)'
+            return colored('The server cannot process the request (CTRL + C for stop)', 'red')
         else:
-            return f'Code not recognized: {code} (CTRL + C for stop)'
+            return colored(f'Code not recognized: {code} (CTRL + C for stop)', 'red')
     
     def ParsePrice(text):
         answer = ''
