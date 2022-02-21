@@ -3,34 +3,39 @@ from tkinter import UNDERLINE
 from xml.etree.ElementTree import TreeBuilder
 import requests
 from bs4 import BeautifulSoup
-import time
 import sqlite3
-from termcolor import colored, cprint
+from termcolor import colored
+import time
 
 class DBManager:
 
     def __init__(self, con, cur):
         self.con = con
         self.cur = cur
-        DBManager.CreateDataBase(self)
 
-    def CreateDataBase(self):
+    def CreateTable(self, region):
 
-        self.cur.execute("""CREATE TABLE IF NOT EXISTS data (ID bigint, 
-                                                       LotName text,
-                                                       LotPrice text,
-                                                       LotPriceInt bigint,
-                                                       LotURL text)""")
+        self.cur.execute(f"""CREATE TABLE IF NOT EXISTS {region} (LotName text,
+                                                                  LotPrice text,
+                                                                  LotPriceInt bigint,
+                                                                  LotURL text)""")
 
         self.con.commit()
 
-    def InsertInDB(self, LotID, name, price, priceint, url_card):
-        self.cur.execute(f'INSERT INTO data VALUES (?, ?, ?, ?, ?)', (LotID, name, price, priceint, url_card))
+    def InsertInDB(self, region, name, price, priceint, url_card):
+        self.cur.execute(f'INSERT INTO {region} VALUES (?, ?, ?, ?)', (name, price, priceint, url_card))
         self.con.commit()
+    
+    def Insert(self, region, name, price, priceint, url_card):
+        DBManager.InsertInDB(self, region, name, price, priceint, url_card)
 
-    def DataCheck(self, url):
-        self.cur.execute(f'SELECT LotURL FROM data WHERE LotURL = "{url}"')
-        return self.cur.fetchone()
+    def DataCheck(self, region, url):
+        try:
+            self.cur.execute(f'SELECT LotURL FROM {region} WHERE LotURL = "{url}"')
+            return self.cur.fetchone()
+        except sqlite3.OperationalError:
+            DBManager.CreateTable(self, region)
+            return None
 
 
 class AvitoParser(DBManager):
@@ -44,39 +49,51 @@ class AvitoParser(DBManager):
 
     def Parse(self):
 
+        #REGIONS = ['moskva_i_mo', 'kemerovskaya_oblast', 'leningradskaya_oblas', 'novosibirskaya_oblast', 'tyumenskaya_oblast', 'irkutskaya_oblast']
+
         page = 1
-        LotID = 1
+
+        """url = f'https://www.avito.ru/rossiya/tovary_dlya_kompyutera/komplektuyuschie/videokarty-ASgBAgICAkTGB~pm7gmmZw?cd=1&p={page}'
+        time.sleep(5)
+        src = requests.get(url, headers=self.headers)
+        print(AvitoParser.CodeStatusCheck(code=src.status_code))
+        soup = BeautifulSoup(src.text, 'lxml')
+        print(soup.find('span', class_ = 'geo-address-fhHd0 text-text-LurtD text-size-s-BxGpL').text)"""
+
+
 
         while True:
             try:
                 num = 1
-                url = f'https://www.avito.ru/moskva/tovary_dlya_kompyutera/komplektuyuschie/videokarty-ASgBAgICAkTGB~pm7gmmZw?cd=1&p={page}'
+                url = f'https://www.avito.ru/rossiya/tovary_dlya_kompyutera/komplektuyuschie/videokarty-ASgBAgICAkTGB~pm7gmmZw?cd=1&p={page}'
                 print(f'\n=============== P A G E: {page} ===============\n')
-                time.sleep(3)
+                time.sleep(4)
                 src = requests.get(url, headers=self.headers)
                 print(AvitoParser.CodeStatusCheck(code=src.status_code))
                 soup = BeautifulSoup(src.text, 'lxml')
                 answer = soup.find_all('div', class_ = 'iva-item-content-rejJg')
                 for j in answer:
                     j = str(j)
-                    soup2 = BeautifulSoup(j, 'lxml')
-                    name = soup2.find('h3').text
-                    price = soup2.find('span', class_ = 'price-text-_YGDY text-text-LurtD text-size-s-BxGpL').text
-                    url_card = 'https://avito.ru'+AvitoParser.ParseTeg(str(soup2.find('a')), 'href')
-                    answer = AvitoParser.ParseFromDB(DBManager.DataCheck(self, url_card))
+                    lot_soup = BeautifulSoup(j, 'lxml')
+                    name = lot_soup.find('h3').text
+                    price = lot_soup.find('span', class_ = 'price-text-_YGDY text-text-LurtD text-size-s-BxGpL').text
+                    url_card = 'https://avito.ru'+AvitoParser.ParseTeg(str(lot_soup.find('a')), 'href')
+                    answer = AvitoParser.ParseFromDB(DBManager.DataCheck(self, AvitoParser.ParseRegion(url_card), url_card))
                     if answer[0] != None:
                         print(f"{colored(num, 'magenta')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'magenta')}")
                     else:
-                        DBManager.InsertInDB(self, LotID, name, price, AvitoParser.ParsePrice(price), url_card)
+                        DBManager.Insert(self, AvitoParser.ParseRegion(url_card), name, price, AvitoParser.ParsePrice(price), url_card)
                         print(f"{colored(num, 'green')} --> Lot name: {name} | Lot price: {price} | {url_card} | Lot status: {colored(answer[1], 'green', attrs=['underline'])}")
                     num += 1
-                    LotID += 1
 
                 page += 1
 
             except KeyboardInterrupt:
                 print('Program stoped')
                 exit(1)
+            
+            except requests.exceptions.ChunkedEncodingError:
+                pass
 
     def CodeStatusCheck(code):
         if code == 200:
@@ -91,6 +108,22 @@ class AvitoParser(DBManager):
             return colored('The server cannot process the request (CTRL + C for stop)', 'red')
         else:
             return colored(f'Code not recognized: {code} (CTRL + C for stop)', 'red')
+    
+    def ParseRegion(url):
+        text = ''
+        answer = ''
+        for i in list(url):
+            if text == 'https://avito.ru/':
+                if i == '/':
+                    return answer  
+                    break
+                else:
+                    if i == '-':
+                        answer += '_'    
+                    else:
+                        answer += i
+            else:
+                text += i
     
     def ParsePrice(text):
         answer = ''
